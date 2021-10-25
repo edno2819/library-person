@@ -7,16 +7,19 @@ import time
 
 
 # ARQUIVOS DE CONFIGS ------------------------------------------------------------------------------------------------------
-def consult_csv():
+def consult_csv(path='configs.txt', sep='='):
     configs={}
     gnore = [' ', '[', '#']
-    with open('configs.txt', newline='', encoding='utf-8') as csvfile:
+    with open(path, newline='', encoding='utf-8') as csvfile:
         spamreader = csv.reader(csvfile, delimiter='\n')
         for row in spamreader:
             if row!=[]:
                 if row[0][0] not in gnore:
-                    dic = row[0].split('=')
+                    dic = row[0].split(sep)
+                    dic = [dic[0], ''.join(dic[1:])]
                     value = dic[1].strip().split(',')
+                    value = [val.strip() for val in value]
+
                     configs[dic[0].strip()] = '' if len(dic)<2 else value
     return configs
 
