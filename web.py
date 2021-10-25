@@ -1,26 +1,49 @@
-from selenium.webdriver.remote.remote_connection import LOGGER, logging
-from selenium.webdriver.common.action_chains import ActionChains
-from selenium.webdriver.support import expected_conditions as EC
+from selenium import webdriver
 from selenium.webdriver.support.ui import WebDriverWait
-from webdriver import Webdriver as Webdriver_base
-import pandas as pd 
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.common.action_chains import ActionChains
+from selenium.webdriver.remote.remote_connection import LOGGER, logging
+from webdriver_manager.chrome import ChromeDriverManager
 import time
 import os
 
 
 LOGGER.setLevel(logging.WARNING)
 
-
 class Webdriver():
-    def __init__(self, headless=False, profile=False):
-        self.webdriver = Webdriver_base()
-        self.webdriver.profile = profile
-        self.webdriver.headless = headless
+    def __init__(self, profiles=False, headless=False, kwargs={}):
 
+        self.options = webdriver.ChromeOptions()
+        self.options.add_argument("--headless") if headless==True else self.options.add_argument("--start-maximized")
+        self.options.add_experimental_option('excludeSwitches', ['enable-logging'])  
+  
+        self.kwargs=kwargs
+        
+        if profiles:
+            dir_path = os.getcwd()
+            profile = os.path.join(dir_path, "profile", "wpp")        
+            self.options.add_argument(r"--user-data-dir={}".format(profile))  
+
+
+        self.update_webdriver()
+    
     def start(self):
-        self.webdriver.start()
-        self.driver = self.webdriver.driver
-        self.wait = self.webdriver.wait
+        # service = Service('chromedriver.exe')
+        # service.creationflags = CREATE_NO_WINDOW'service=service
+        self.driver = webdriver.Chrome(ChromeDriverManager().install(), options=self.options, **self.kwargs)
+        self.wait = WebDriverWait(self.driver, 10)
+    
+    def update_webdriver(self):
+        try:
+            if 'browserVersion' in self.driver.capabilities:
+                version=self.driver.capabilities['browserVersion']
+            else:
+                version=self.driver.capabilities['version']
+
+            gdd = ChromeDriverManager()
+            gdd.download_and_install(version)
+        except:
+            pass 
 
     def open_page(self,url):
         self.driver.get(url)
@@ -50,12 +73,12 @@ class Webdriver():
         elem = locator
         if type(locator) is tuple:
             elem = EC.element_to_be_clickable(locator)
-            elem = self.wait.until(elem)
+            elem = self.exist(locator, wait=3, retur= True)
         if hover_to:
             self.move_element(elem)
         elem.click()
         
-    def exist(self,element, wait=10, retur=False):
+    def exist(self, element, wait=10, retur = False):
         try:
             element = WebDriverWait(self.driver, wait).until(
                 EC.presence_of_element_located(element)
@@ -92,9 +115,9 @@ class Webdriver():
     def refresh(self):
         self.driver.refresh()
 
-    def switch_to_frame(self, frame="son_frame"):
+    def switch_to_frame(self, frame="root_frame"):
         if frame == 'root_frame':
-            self.driver.switch_to.default_content()
+            self.driver.switch_to_window(self.driver.window_handles[0])
         else:
             self.driver.switch_to.frame(frame)
 
@@ -104,47 +127,15 @@ class Webdriver():
             if '.crdownload' not in file:
                 time.sleep(1)
                 return file
-
     def zoom(self,zoom):
         self.driver.execute_script(f"document.body.style.zoom='{zoom}'")
 
-    def screenshot(self, file, zoom='100%', add_timestamp=False):
+    def screenshot(self, file, zoom='100%'):
         self.zoom(zoom)
-        self.driver.save_screenshot(f'{file}.png') if not add_timestamp else self.driver.save_screenshot(f'{file} {time.time()}.png')
+        self.driver.save_screenshot(file)
         self.zoom('100%')
-
-    def get_table(self, elem, header=0):
-        return pd.read_html(elem.get_attribute('outerHTML'), header=header)[0]
-    
-    def full_screenshot(self, path) -> None:
-        original_size = self.driver.get_window_size()
-        required_width = self.driver.execute_script('return document.body.parentNode.scrollWidth')
-        required_height = self.driver.execute_script('return document.body.parentNode.scrollHeight')
-        self.driver.set_window_size(required_width, required_height)
-        self.driver.save_screenshot(path)  # has scrollbar
-        self.driver.find_element_by_tag_name('body').screenshot(path)  # avoids scrollbar
-        self.driver.set_window_size(original_size['width'], original_size['height'])
 
     def close(self):
         self.driver.quit()
 
-    def save_as_pdf(self, name_file, path_new):
-        home = os.path.expanduser('~')
-        path = os.path.join(home, 'Downloads')
 
-        self.driver.execute_script('window.print();')
-        file = self.wait_download()
-        try:
-            os.rename(f'{path}\\{file}',f'{path_new}\\{name_file}.pdf')
-        except:
-            pass
-
-    def wait_download(self):
-        home = os.path.expanduser('~')
-        path = os.path.join(home, 'Downloads')
-        file = os.listdir(path)[0]
-        if '.tmp' not in file:
-            if '.crdownload' not in file:
-                time.sleep(1)
-                return file
-        
